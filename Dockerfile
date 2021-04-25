@@ -1,4 +1,4 @@
-FROM python:3.7-alpine
+FROM python:3.8-alpine
 MAINTAINER QZQ
 
 RUN echo http://mirrors.aliyun.com/alpine/v3.12/main > /etc/apk/repositories

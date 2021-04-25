@@ -5,7 +5,7 @@ services:
     container_name: flask-restful-example
     restart: always
     ports:
-      - "3010:80"
+      - "75:80"
     volumes:
       - ./logs:/projects/logs
       - ./report:/projects/report

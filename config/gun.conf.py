@@ -7,11 +7,11 @@ threads = 4
 # 监听内网端口80
 bind = '0.0.0.0:80'
 # 工作模式协程
-worker_class = 'eventlet' #'gevent'
+worker_class = 'gevent'  # 'gevent eventlet'
 # 设置最大并发量
 worker_connections = 2000
 # 设置进程文件目录
-pidfile = 'gunicorn.pid'
+# pidfile = 'gunicorn.pid'
 # 设置访问日志和错误信息日志路径
 accesslog = './logs/gunicorn_acess.log'
 errorlog = './logs/gunicorn_error.log'
