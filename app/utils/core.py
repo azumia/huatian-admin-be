@@ -5,7 +5,8 @@ import uuid
 from flask.json import JSONEncoder as BaseJSONEncoder
 from flask_sqlalchemy import SQLAlchemy
 from flask_apscheduler import APScheduler
-
+from sqlalchemy.ext.declarative import DeclarativeMeta
+import json
 scheduler = APScheduler()
 
 db = SQLAlchemy()
@@ -34,4 +35,19 @@ class JSONEncoder(BaseJSONEncoder):
         if isinstance(o, bytes):
             # 格式化字节数据
             return o.decode("utf-8")
+        if hasattr(o, 'keys') and hasattr(o, '__getitem__'):
+            return dict(o)
+        if type(o) == datetime.timedelta:
+           return str(o)
+        if isinstance(o.__class__, DeclarativeMeta):
+            data = {}
+            fields = o.__json__() if hasattr(o, '__json__') else dir(o)
+            for field in [f for f in fields if not f.startswith('_') and f not in ['metadata', 'query', 'query_class']]:
+                value = o.__getattribute__(field)
+                try:
+                    json.dumps(value)
+                    data[field] = value
+                except TypeError:
+                    data[field] = None
+            return data
         return super(JSONEncoder, self).default(o)

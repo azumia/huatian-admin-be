@@ -20,3 +20,13 @@ class ArticleAPI(Service):
     __methods__ = ["GET", "POST", "PUT", "DELETE"]
 
     service_name = 'article'
+class UserAPI(Service):
+    """
+    文章单表接口
+    """
+    __model__ = User
+    # 指定需要启用的请求方法
+    __methods__ = ["GET", "POST", "PUT", "DELETE"]
+
+    service_name = 'user'
+    __name__ = 'user'

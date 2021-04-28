@@ -6,10 +6,11 @@ class User(db.Model):
     """
     用户表
     """
-    __tablename__ = 'user'
+    __tablename__ = 'ht_student'
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
     name = db.Column(db.String(20), nullable=False)  # 用户姓名
     age = db.Column(db.Integer, nullable=False)  # 用户年龄
+    remark = db.Column(db.String(500), nullable=False)  # 备注
 
 
 class UserLoginMethod(db.Model):
