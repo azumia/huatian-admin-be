@@ -6,6 +6,7 @@ import yaml
 import os
 from flask import Flask, Blueprint
 from app.celery import celery_app
+from flask_cors import CORS
 
 from app.utils.core import JSONEncoder, db, scheduler
 from app.api.router import router
@@ -13,6 +14,10 @@ from app.api.router import router
 
 def create_app(config_name, config_path=None):
     app = Flask(__name__)
+    # 配置cors
+    cors = CORS()
+    cors.init_app(app=app, resources={r"/*": {"origins": "*"}})
+
     # 读取配置文件
     if not config_path:
         pwd = os.getcwd()
