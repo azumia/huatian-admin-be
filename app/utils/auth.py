@@ -7,7 +7,7 @@ from app.utils.util import ResMsg
 
 
 class Auth(object):
-    key = 'super-man$&123das%qzq'
+    key = 'super-man$&123das%qzq68'
 
     @classmethod
     def generate_access_token(cls, user_id, algorithm: str = 'HS256', exp: float = 2):
@@ -26,7 +26,7 @@ class Auth(object):
             'exp': exp_datetime,
             'flag': 0,  # 标识是否为一次性token，0是，1不是
             'iat': now,  # 开始时间
-            'iss': 'qin',  # 签名
+            'iss': 'azumia',  # 签名
             'user_id': user_id  # 自定义部分
         }
         access_token = jwt.encode(access_payload, key, algorithm=algorithm)
@@ -85,7 +85,7 @@ class Auth(object):
         try:
             # 取消过期时间验证
             # payload = jwt.decode(auth_token, config.SECRET_KEY, options={'verify_exp': False})
-            payload = jwt.decode(token, key=key, )
+            payload = jwt.decode(token, key=key, options={'verify_exp': True})
 
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, jwt.InvalidSignatureError):
             return None
@@ -100,6 +100,8 @@ class Auth(object):
         """
         if auth_header:
             payload = self.decode_auth_token(auth_header)
+            current_app.logger.debug('------>>')
+            current_app.logger.debug(payload)
             if payload is None:
                 return False
             if "user_id" in payload and "flag" in payload:

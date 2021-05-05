@@ -18,9 +18,39 @@ from app.api.wx_login_or_register import get_access_code, get_wx_user_info, wx_l
 from app.api.phone_login_or_register import SendSms, phone_login_or_register
 from app.celery import add, flask_app_context
 
-bp = Blueprint("test", __name__, url_prefix='/')
+bp = Blueprint("user", __name__, url_prefix='/user/')
 
 logger = logging.getLogger(__name__)
+
+
+@route(bp, '/login', methods=["POST"])
+def user_login():
+    """
+    登陆成功获取到数据获取token和刷新token
+    :return:
+    """
+    res = ResMsg()
+    obj = request.get_json(force=True)
+    user_name = obj.get("username")
+    user_password = obj.get("password")
+    db_user = db.session.query(User).filter(User.name == user_name).first()
+    # 未获取到参数或参数不存在
+    if not obj or not user_name or not user_password:
+        res.update(code=ResponseCode.InvalidParameter)
+        return res.data
+
+    if user_name == db_user.name and user_password == db_user.password:
+        # 生成数据获取token和刷新token
+        access_token, refresh_token = Auth.encode_auth_token(user_id=user_name)
+
+        data = {"access_token": access_token.decode("utf-8"),
+                "refresh_token": refresh_token.decode("utf-8")
+                }
+        res.update(data=data)
+        return res.data
+    else:
+        res.update(code=ResponseCode.AccountOrPassWordErr)
+        return res.data
 
 
 # -----------------原生蓝图路由---------------#

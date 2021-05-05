@@ -6,12 +6,14 @@ class User(db.Model):
     """
     用户表
     """
-    __tablename__ = 'ht_student'
+    __tablename__ = 'ht_user'
     id = db.Column(db.Integer, autoincrement=True, primary_key=True)
-    name = db.Column(db.String(20), nullable=False)  # 用户姓名
-    age = db.Column(db.Integer, nullable=False)  # 用户年龄
-    remark = db.Column(db.String(500), nullable=False)  # 备注
-
+    name = db.Column(db.String(255), nullable=False)  # 用户姓名
+    password = db.Column(db.String(255), nullable=False)  # 用户密码
+    email = db.Column(db.String(255), nullable=True)  # 用户密码
+    phone = db.Column(db.String(15), nullable=True)  # 用户手机号
+    access_code = db.Column(db.String(255), nullable=True)  # token
+    update_time = db.Column(db.DateTime, nullable=True)  # 更新时间
 
 class UserLoginMethod(db.Model):
     """
