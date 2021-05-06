@@ -1,8 +1,8 @@
 version: "2"
 services:
   flask_app:
-    image: flask-restful-example:latest
-    container_name: flask-restful-example
+    image: flask-restful-huatian:latest
+    container_name: flask-restful-huatian
     restart: always
     ports:
       - "75:80"
