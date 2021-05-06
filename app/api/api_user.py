@@ -35,7 +35,7 @@ def user_login():
     user_password = obj.get("password")
     db_user = db.session.query(User).filter(User.name == user_name).first()
     # 未获取到参数或参数不存在
-    if not obj or not user_name or not user_password:
+    if not obj or not user_name or not user_password or not db_user:
         res.update(code=ResponseCode.InvalidParameter)
         return res.data
 

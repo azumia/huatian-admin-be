@@ -15,8 +15,7 @@ from app.api.router import router
 def create_app(config_name, config_path=None):
     app = Flask(__name__)
     # 配置cors
-    cors = CORS()
-    cors.init_app(app=app, resources={r"/*": {"origins": "*"}})
+    CORS(app, resources={r"/*": {"origins": "*"}})
 
     # 读取配置文件
     if not config_path:
