@@ -12,13 +12,13 @@ steps:
 #       from_secret: sonar_token
 
 # 测试
-- name: code-test
+- name: 代码测试
   image: python:3
   commands:
   - pip install -r requirements.txt
 
 # 构建代码docker镜像
-- name: code-build
+- name: 构建代码
   image: plugins/docker
   settings:
     registry: 
@@ -34,8 +34,8 @@ steps:
       - '1.0'
 
 # 将部署文件放入指定目录
-- name: code-scp
-  image: azumia/flask-restful-huatian
+- name: 放入指定目录
+  image: appleboy/drone-scp
   settings:
     host: 
       from_secret: ssh_host
@@ -49,7 +49,7 @@ steps:
 
 # 部署项目
 - name: code-deploy
-  image: azumia/flask-restful-huatian
+  image: appleboy/drone-ssh
   settings:
     host: 
       from_secret: ssh_host
