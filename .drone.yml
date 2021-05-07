@@ -11,9 +11,19 @@ steps:
 #     sonar_token:
 #       from_secret: sonar_token
 
+# - name: restore-cache  
+#   image: drillster/drone-volume-cache  
+#   settings:  
+#     restore: true  
+#     mount:  
+#       - ./venv  
+#   volumes:  
+#     - name: cache  
+#       path: /cache
+
 # 测试
 - name: 代码测试
-  image: python:3
+  image: python:3.8.1
   commands:
   - pip install -r requirements.txt
 
@@ -65,3 +75,8 @@ steps:
   when:
     branch:
       - master
+
+# volumes:  
+#   - name: cache  
+#     host:  
+#       path: /tmp/cache
