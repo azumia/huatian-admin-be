@@ -4,6 +4,8 @@ from flask import current_app, request, session
 from functools import wraps
 from app.utils.code import ResponseCode
 from app.utils.util import ResMsg
+from app.models.model import User
+from app.utils.core import db
 
 
 class Auth(object):
@@ -100,8 +102,8 @@ class Auth(object):
         """
         if auth_header:
             payload = self.decode_auth_token(auth_header)
-            current_app.logger.debug('------>>')
-            current_app.logger.debug(payload)
+            current_app.logger.debug('---jwt验证通过--->>')
+            # current_app.logger.debug(payload)
             if payload is None:
                 return False
             if "user_id" in payload and "flag" in payload:
@@ -134,7 +136,6 @@ def login_required(f):
         if not token:
             res.update(code=ResponseCode.PleaseSignIn)
             return res.data
-
         auth = Auth()
         user_name = auth.identify(token)
         if not user_name:
@@ -143,6 +144,8 @@ def login_required(f):
 
         # 获取到用户并写入到session中,方便后续使用
         session["user_name"] = user_name
+        db_user = db.session.query(User).filter(User.name == user_name).first()
+        session["user_nickname"] = db_user.nick_name
         return f(*args, **kwargs)
 
     return wrapper

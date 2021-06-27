@@ -5,7 +5,7 @@ services:
     container_name: flask-restful-huatian
     restart: always
     ports:
-      - "75:80"
+      - "78:80"
     volumes:
       - ./logs:/projects/logs
       - ./report:/projects/report

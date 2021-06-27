@@ -2,13 +2,20 @@ import logging
 import random
 import uuid
 import os
+import copy
 from flask import Blueprint, jsonify, session, request, current_app
 from datetime import datetime, timedelta
 from decimal import Decimal
-from app.models.model import User
+
+from sqlalchemy.sql.elements import Null
+from app.models.model import Class, Student, StuCls, User, Log, Teacher, ClsWd
 from app.utils.core import db
 
+from sqlalchemy import or_, and_
+
 from app.api.tree import Tree
+from app.api.api_stu_cls import add_stu_cls, delete_stu_cls
+from app.api.api_log import add_log
 from app.utils.code import ResponseCode
 from app.utils.response import ResMsg
 from app.utils.util import route, Redis, CaptchaTool, PhoneTool
@@ -18,68 +25,300 @@ from app.api.wx_login_or_register import get_access_code, get_wx_user_info, wx_l
 from app.api.phone_login_or_register import SendSms, phone_login_or_register
 from app.celery import add, flask_app_context
 
-bp = Blueprint("user", __name__, url_prefix='/user/')
+bp = Blueprint("student", __name__, url_prefix='/student/')
 
 logger = logging.getLogger(__name__)
 
-
-@route(bp, '/login', methods=["POST"])
-def user_login():
-    """
-    登陆成功获取到数据获取token和刷新token
-    :return:
-    """
-    res = ResMsg()
-    obj = request.get_json(force=True)
-    user_name = obj.get("username")
-    user_password = obj.get("password")
-    db_user = db.session.query(User).filter(User.name == user_name).first()
-    # 未获取到参数或参数不存在
-    if not obj or not user_name or not user_password or not db_user:
-        res.update(code=ResponseCode.InvalidParameter)
-        return res.data
-
-    if user_name == db_user.name and user_password == db_user.password:
-        # 生成数据获取token和刷新token
-        access_token, refresh_token = Auth.encode_auth_token(user_id=user_name)
-
-        data = {"access_token": access_token.decode("utf-8"),
-                # "refresh_token": refresh_token.decode("utf-8")
-                }
-        res.update(data=data)
-        return res.data
-    else:
-        res.update(code=ResponseCode.AccountOrPassWordErr)
-        return res.data
-
-
-@route(bp, '/info', methods=["GET"])
+@route(bp, '/list', methods=["GET"])
 @login_required
-def user_info():
+def student_list():
     """
-    获取用户信息
+    获取学员列表
     :return:
     """
     res = ResMsg()
-    name = session.get("user_name")
-    current_app.logger.debug(session)
+    # obj = request.get_json(force=True)
+    obj = request.args
+    name = obj.get("name") or None
+    phone = obj.get("phone") or None
+    type = obj.get("type") or None
+    page_index = int(obj.get("page"))
+    page_size = int(obj.get("count"))
+    filters = {
+        or_(Student.name == name, name == None),
+        or_(Student.phone == phone, phone == None),
+        or_(Student.type == type, type == None),
+    }
+    # current_app.logger.debug(db.session.query(Student).filter(*filters).order_by(Student.id).limit(page_size).offset((page_index-1)*page_size))
+    db_student = db.session.query(Student).filter(*filters).order_by(Student.id).limit(page_size).offset((page_index-1)*page_size).all()
+    total_count = db.session.query(Student).filter(*filters).count()
+    all_class = db.session.query(Class).all()
+    student_list = []
+    for stu in db_student:
+        class_id = []
+        n_stu_cls = db.session.query(StuCls).filter(StuCls.student_id == stu.id).all()
+        for nstu in n_stu_cls:
+            for cla in all_class:
+                if nstu.class_id == cla.id:
+                    class_id.append(cla)
+        student_list.append({
+            'id': stu.id,
+            'name': stu.name,
+            'type': stu.type,
+            'phone': stu.phone,
+            'birthday': stu.birthday,
+            'age': stu.age,
+            'class_id': class_id,
+            'used_hour': stu.used_hour,
+            'left_hour': stu.left_hour,
+            'remark': stu.remark
+        })
     data = {
-            "name": name,
-            "nick_name": session.get("user_nickname")
+            "students": student_list,
+            "page": page_index,
+            "count": page_size,
+            "total": total_count
             }
+    
+    res.update(data=data)
+    return res.data
+
+@route(bp, '/detail', methods=["GET"])
+@login_required
+def student_detail():
+    """
+    获取单个学员信息
+    :return:
+    """
+    res = ResMsg()
+    obj = request.args
+    db_student = db.session.query(Student).filter(Student.id == obj['id']).first()
+    n_stu_cls = db.session.query(StuCls).filter(StuCls.student_id == obj['id']).all()
+    stu_cls_ids = []
+    for stucls in n_stu_cls:
+        stu_cls_ids.append(stucls.class_id)
+    n_class = db.session.query(Class).filter(Class.id.in_(stu_cls_ids)).all()
+    data = {
+            "detail": db_student,
+            "classes": n_class
+            }
+    
     res.update(data=data)
     return res.data
 
 
-@route(bp, '/logout', methods=["POST"])
+@route(bp, '/add', methods=["POST"])
 @login_required
-def user_logout():
+def student_add():
     """
-    用户登出
+    新增学员信息
     :return:
     """
     res = ResMsg()
+    obj = request.json
+    n_student = Student()
+    n_student.name = obj["name"]
+    n_student.phone = obj["phone"]
+    n_student.birthday = obj["birthday"] or None
+    n_student.age = obj["age"] or None
+    n_student.used_hour = obj["used_hour"] or None
+    n_student.left_hour = obj["left_hour"] or None
+    n_student.type = obj["type"] or None
+    n_student.remark = obj["remark"] or None
+    n_student.status = obj["status"] or None
+    n_student.create_time = datetime.now()
+    n_student.update_time = datetime.now()
+    user = db.session.query(User).filter(User.name == session["user_name"]).first()
+    try:
+        db.session.add(n_student)
+        db.session.flush()
+        # 添加日志
+        add_log(1, user.id, n_student.id, None, None, '新增了学员信息')
+        if len(obj["classArr"]) > 0:
+            for o in obj["classArr"]:
+                add_stu_cls(n_student.id, o["id"])
+        db.session.commit()
+    except:
+        db.session.rollback()
     return res.data
+
+@route(bp, '/edit', methods=["POST"])
+@login_required
+def student_edit():
+    """
+    编辑学员信息
+    :return:
+    """
+    res = ResMsg()
+    obj = request.json
+    # o_student = db.session.query(Student).filter(Student.id == obj["id"]).first()
+    n_student = db.session.query(Student).filter(Student.id == obj["id"]).first()
+    o_student = copy.deepcopy(n_student)
+    n_student.name = obj["name"]
+    n_student.phone = obj["phone"]
+    n_student.birthday = obj["birthday"] or None
+    n_student.age = obj["age"] or None
+    n_student.used_hour = obj["used_hour"] or None
+    n_student.left_hour = obj["left_hour"] or None
+    n_student.type = obj["type"] or None
+    n_student.remark = obj["remark"]
+    n_student.status = obj["status"] or None
+    n_student.update_time = datetime.now()
+
+    classIdArr = []
+    if len(obj["classArr"]) > 0:
+        for o in obj["classArr"]:
+            classIdArr.append(str(o["id"]))
+    stuClsIdArr = []
+    n_stu_cls = db.session.query(StuCls).filter(StuCls.student_id == n_student.id).all()
+    user = db.session.query(User).filter(User.name == session["user_name"]).first()
+    n_class = db.session.query(Class).all()
+    for stu in n_stu_cls:
+        stuClsIdArr.append(str(stu.class_id))
+    try:
+        # 如果更改了课时，则添加日志
+        if o_student.used_hour != n_student.used_hour or o_student.left_hour != n_student.left_hour:
+            add_log(3, user.id, n_student.id, None, None, '更改了课时，更改前已用课时 ' + str(o_student.used_hour) + ',剩余课时 ' + str(o_student.left_hour) + '; 更改后已用课时 ' + str(n_student.used_hour) + ',剩余课时 ' + str(n_student.left_hour))
+        elif o_student.remark != n_student.remark:
+            add_log(1, user.id, n_student.id, None, None, '将备注更改为: ' + n_student.remark)
+        else:
+            add_log(1, user.id, n_student.id, None, None, '更改了学员资料')
+        db.session.add(n_student)
+        db.session.commit()
+        if len(classIdArr) > 0:
+            for cid in classIdArr:
+                if cid not in stuClsIdArr:
+                    add_stu_cls(n_student.id, cid)
+                    # 添加日志
+                    class_name = ''
+                    for nls in n_class:
+                        if nls.id == cid:
+                            class_name = nls.class_name
+                            break
+                    add_log(2, user.id, n_student.id, None, None, '将其添加到了班级：' + class_name + '中')
+            for ccid in stuClsIdArr:
+                if ccid not in classIdArr:
+                    delete_stu_cls(n_student.id, ccid)
+                    # 添加日志
+                    class_name = ''
+                    for nls in n_class:
+                        if nls.id == ccid:
+                            class_name = nls.class_name
+                            break
+                    add_log(2, user.id, n_student.id, None, None, '将其添加从班级：' + class_name + '中移除')
+    except:
+        db.session.rollback()
+    return res.data
+
+@route(bp, '/delete', methods=["POST"])
+@login_required
+def student_delete():
+    """
+    删除学员信息
+    :return:
+    """
+    res = ResMsg()
+    obj = request.json
+    n_student = db.session.query(Student).filter(Student.id == obj["id"]).first()
+    n_stu_cls = db.session.query(StuCls).filter(StuCls.student_id == obj["id"])
+    try:
+        db.session.delete(n_student)
+        n_stu_cls.delete(synchronize_session=False)
+        db.session.commit()
+    except:
+        db.session.rollback()
+    return res.data
+
+@route(bp, '/logs', methods=["GET"])
+@login_required
+def log_list():
+    """
+    获取日志列表
+    :return:
+    """
+    res = ResMsg()
+    obj = request.args
+    n_user = db.session.query(User).all()
+    n_teacher = db.session.query(Teacher).all()
+    n_student = db.session.query(Student).all()
+    n_class = db.session.query(Class).all()
+    n_log = db.session.query(Log).filter(Log.student_id == obj['sid']).order_by(Log.id.desc()).all()
+    dataList = []
+    if len(n_log) > 0:
+        for log in n_log:
+            operator_name = ''
+            teacher_name = ''
+            student_name = ''
+            class_name = ''
+            for user in n_user:
+                if user.id == log.operator_id:
+                    operator_name = user.nick_name
+            for teacher in n_teacher:
+                if teacher.id == log.teacher_id:
+                    teacher_name = teacher.name
+            for student in n_student:
+                if student.id == log.student_id:
+                    student_name = student.name
+            for cls in n_class:
+                if cls.id == log.class_id:
+                    class_name = cls.class_name
+            dataList.append({
+                'id': log.id,
+                'type': log.type,
+                'time': log.time,
+                'teacher_id': log.teacher_id,
+                'teacher_name': teacher_name,
+                'student_id': log.student_id,
+                'student_name': student_name,
+                'class_id': log.class_id,
+                'class_name': class_name,
+                'operator_id': log.operator_id,
+                'operator_name': operator_name,
+                'remark': log.remark
+            })
+    data = {
+        'dataList': dataList
+    }
+    res.update(data=data)
+    return res.data
+
+@route(bp, '/course', methods=["GET"])
+@login_required
+def course_list():
+    """
+    获取课程列表
+    :return:
+    """
+    res = ResMsg()
+    obj = request.args
+    stu_cls = db.session.query(StuCls).filter(StuCls.student_id == obj['sid']).all()
+    classid_arr = []
+    for sc in stu_cls:
+        classid_arr.append(sc.class_id)
+    cls_wd = db.session.query(ClsWd).filter(ClsWd.class_id.in_(classid_arr)).all()
+    n_class = db.session.query(Class).filter(Class.id.in_(classid_arr)).all()
+    weekSet = set([])
+    for sw in cls_wd:
+        weekSet.add(sw.weekday)
+    course_list = {}
+    for wd in weekSet:
+        week_cls = []
+        # 获取每周几的班级id列表
+        for clswd in cls_wd:
+            if clswd.weekday == wd:
+                week_cls.append(clswd.class_id)
+        cls_arr = []
+        for wc in week_cls:
+            for nc in n_class:
+                if wc == nc.id:
+                    cls_arr.append(nc)
+        course_list[wd] = cls_arr
+    res.update(data = {
+        'course_list': course_list
+    })
+    return res.data
+    
+
 # -----------------原生蓝图路由---------------#
 
 
